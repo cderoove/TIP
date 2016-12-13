@@ -1,3 +1,5 @@
+name := "tip"
+
 scalaVersion := "2.11.8"
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 
@@ -10,3 +12,10 @@ scalaSource in Compile := baseDirectory.value / "src"
 scalaSource in Test := baseDirectory.value / "test"
 
 
+// ~~~~ sbt-start-script (https://github.com/sbt/sbt-start-script)
+// Creates an invocation wrapper script `target/start`.  We customize it here to create `target/tip` instead.
+// Usage:
+// $ sbt start-script
+import com.typesafe.sbt.SbtStartScript
+Seq(SbtStartScript.startScriptForClassesSettings: _*)
+SbtStartScript.StartScriptKeys.startScriptName <<= target / "tip"
