@@ -6,5 +6,4 @@ PROJECT_DIR=$(cd "${BASH_SOURCE[0]%/*}" && pwd -P)
 cd $PROJECT_DIR
 sbt ';compile;start-script'
 
-cd $PROJECT_DIR/target
-./tip $@
+$PROJECT_DIR/target/tip $@

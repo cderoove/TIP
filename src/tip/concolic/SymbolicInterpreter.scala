@@ -293,10 +293,12 @@ class SymbolicInterpreter(program: AProgram) {
     try {
       val result = runFunction(program.mainFunction, Seq(), State(ct = computationTree, inputs = inputs))
       result match {
-        case (resultState, IntValue(i)) => {
+        case (resultState, IntValue(i)) =>
           log.info(s"Program ran succesfully, result: $i")
           Success(resultState, i)
-        }
+        case (resultState, SymbolicValue(IntValue(i), _)) =>  // todo: consider custom extractor to abstract over IntValue(i) and SymbolicValue(IntValue(i),_)
+          log.info(s"Program ran succesfully, result: $i")
+          Success(resultState, i)
         case (resultState, value) => throw new InterpreterException(s"Illegal main function: returned $value, integer expected.", resultState)
       }
     }
@@ -381,17 +383,24 @@ class SymbolicInterpreter(program: AProgram) {
        ids.foreach { id => s.env = s.env + (id.meta.definition.get -> new Location(None)) }
        s
       }
-      case w: AWhileStmt =>
-        val (s1, gvalue) = runExpression(w.guard, s)
+      case w@AWhileStmt(guard, innerBlock, loc) =>  // todo: limit the number of loop iterations
+        val (s1, gvalue) = runExpression(guard, s)
         gvalue match {
+          case SymbolicValue(IntValue(0), symbolicexpression) =>
+            val news = s1.copy(ct = s1.ct.branch(guard, symbolicexpression, false))
+            news
+          case SymbolicValue(IntValue(_), symbolicexpression) =>
+            val news = s1.copy(ct = s1.ct.branch(guard, symbolicexpression, true))
+            runStatement(w, runStatement(innerBlock, news))
           case IntValue(0) => s1
-          case IntValue(_) => runStatement(w, runStatement(w.innerBlock, s1))
-          case _ => guardNotInteger(w.offset, s1)
+          case IntValue(_) => runStatement(w, runStatement(innerBlock, s1))
+          case _ => guardNotInteger(loc, s1)
         }
       case AoutputStmt(value, _) =>
         val (s1, out) = runExpression(value, s)
         out match {
           case IntValue(x) => log.info(s"Program out: $x"); s1
+          case SymbolicValue(IntValue(x), _) => log.info(s"Program out: $x"); s1
           case _ => throw new InterpreterException(s"Output not supported for non-integer values", s1)
         }
     }
