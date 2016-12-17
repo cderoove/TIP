@@ -1,55 +1,74 @@
 package tip.concolic
 
+import java.io.{ByteArrayInputStream, File}
+import scala.util.{Failure, Try}
+
 import org.junit.Test
 import org.junit.Assert._
-import tip.ast.AProgram
-import scala.util.Try
-import tip.interpreter.Interpreter
-import scala.util.Success
-import java.io.ByteArrayInputStream
-import scala.io.StdIn
-import tip.InterpreterUtils._
-import smtlib.parser.Commands.CheckSat
-import smtlib.parser.CommandsResponses.CheckSatStatus
-import smtlib.parser.Terms.SExpr
 
-import smtlib.parser._
-import smtlib.parser.Terms._
-import smtlib.parser.Commands._
-import smtlib.theories.Ints._
-import smtlib.theories.Core._
-import smtlib.parser.CommandsResponses._
+import tip.ast._
+import tip.interpreter.Interpreter
+import tip.InterpreterUtils._
+
 
 class SymbolicInterpreterTests {
 
-	@Test
+  private def allExamples: List[String] =
+    new File("examples").list().toList
+      .map("examples/" + _)
+      .filter(_.endsWith(".tip"))
+      .filter(f => Try(prepare(f)).isSuccess)
+
+  private def requiresInput(n: AstNode): Boolean = {
+    var f = false
+    val inputFinder = new DepthFirstAstVisitor[Null] {
+      override def visit(node: AstNode, arg: Null): Unit = {
+        node match {
+          case AInput(_) => f = true
+          case _         => visitChildren(node, null)
+        }
+      }
+    }
+    inputFinder.visit(n, null)
+    f
+  }
+
+  private def requiresInput(file: String): Boolean =
+    requiresInput(prepare(file))
+
+  private def crashesTheInterpreter(p: AProgram): Boolean =
+    Try(new Interpreter(p).run()).isFailure
+
+  private def crashesTheInterpreter(file: String): Boolean =
+    crashesTheInterpreter(prepare(file))
+
+
+  @Test
 	def haveSameOutput() {
-		val files = List("examples/interpreter_test.tip", "examples/ex1.tip", "examples/signs.tip", "examples/apply2.tip", "examples/signs_fun.tip","examples/signs_fun.tip", "tipprograms/map.tip")
+    val files = allExamples.filterNot(requiresInput).filterNot(crashesTheInterpreter)
 		for(file <- files) {
 		  val p1 = prepare(file)
   		val p2 = prepare(file)
 			val cres = new Interpreter(p1).run()
-			val sres = new SymbolicInterpreter(p2).run()
+      val interpreter = new SymbolicInterpreter(p2)
+      val interpreter.Success(_, sres) = interpreter.run()
 			assertEquals(cres, sres)
 		}
 	}
-	
-	/*
+
 	@Test
 	def haveSameOutputRequiringInput() {
-	  val in = new ByteArrayInputStream(("22\n11").getBytes)
-		val file = ("tipprograms/symbolic1.tip")
+    val in = new ByteArrayInputStream("22\n11".getBytes)
+		val file = "tipprograms/symbolic1.tip"
 		val p1 = prepare(file)
 		val p2 = prepare(file)
 		Console.withIn(in)  {
-		  val cres = new Interpreter(p1).run()   
+      val interpreter1 = new Interpreter(p1)
+      val Failure(interpreter1.ApplicationException(cres)) = Try(interpreter1.run())
 		  assertEquals(cres, 42)
 	  }
-	  val sres = new SymbolicInterpreter(p2).run(List(22,11))
-	  assertEquals(sres, 42)
+    val interpreter2 = new SymbolicInterpreter(p2)
+	  val interpreter2.Failure(_, sres) = interpreter2.run(inputs = List(22,11))
+	  assertEquals(sres, "Application exception occurred during program execution, error code: 42")
 	}
-	*/
-	
-	
-
 }
