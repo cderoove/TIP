@@ -1,17 +1,15 @@
 package tip.concolic
 
 import java.io.{ByteArrayInputStream, File}
+
 import scala.util.{Failure, Try}
-
-import org.junit.Test
-import org.junit.Assert._
-
+import org.scalatest.{FunSuite, Matchers}
 import tip.ast._
 import tip.interpreter.Interpreter
 import tip.InterpreterUtils._
 
 
-class SymbolicInterpreterTests {
+class SymbolicInterpreterTests extends FunSuite with Matchers {
 
   private def allExamples: List[String] =
     new File("examples").list().toList
@@ -43,21 +41,19 @@ class SymbolicInterpreterTests {
     crashesTheInterpreter(prepare(file))
 
 
-  @Test
-	def haveSameOutput() {
-    val files = allExamples.filterNot(requiresInput).filterNot(crashesTheInterpreter)
-		for(file <- files) {
-		  val p1 = prepare(file)
-  		val p2 = prepare(file)
-			val cres = new Interpreter(p1).run()
+  val files = allExamples.filterNot(requiresInput).filterNot(crashesTheInterpreter)
+  for(file <- files) {
+    test(s"haveSameOutput: $file") {
+      val p1 = prepare(file)
+      val p2 = prepare(file)
+      val cres = new Interpreter(p1).run()
       val interpreter = new SymbolicInterpreter(p2)
       val interpreter.Success(_, sres) = interpreter.run()
-			assertEquals(cres, sres)
-		}
-	}
+      cres shouldBe sres
+    }
+  }
 
-	@Test
-	def haveSameOutputRequiringInput() {
+	test("haveSameOutputRequiringInput"){
     val in = new ByteArrayInputStream("22\n11".getBytes)
 		val file = "tipprograms/symbolic1.tip"
 		val p1 = prepare(file)
@@ -65,10 +61,10 @@ class SymbolicInterpreterTests {
 		Console.withIn(in)  {
       val interpreter1 = new Interpreter(p1)
       val Failure(interpreter1.ApplicationException(cres)) = Try(interpreter1.run())
-		  assertEquals(cres, 42)
+      cres shouldBe 42
 	  }
     val interpreter2 = new SymbolicInterpreter(p2)
 	  val interpreter2.Failure(_, sres) = interpreter2.run(inputs = List(22,11))
-	  assertEquals(sres, "Application exception occurred during program execution, error code: 42")
+	  sres shouldBe "Application exception occurred during program execution, error code: 42"
 	}
 }
