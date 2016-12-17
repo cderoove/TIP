@@ -517,6 +517,65 @@ class SymbolicInterpreter(program: AProgram) {
             afterState.env = news.env
             (afterState, afterValue)
           }
+            /* VARIANT 1: just loop and use vars
+          case f: FunValue => {
+            var news: State = s2
+            var vals: List[Value] = Nil
+            for (arg <- args) {
+              val (newstate, value) = runExpression(arg, news)
+              news = newstate
+              vals = value :: vals
+            }
+
+            val (afterState, afterValue) = runFunction(f.fun, vals.reverse, news)
+            //reset env, keep changes to symbolic state
+            afterState.env = news.env
+            (afterState, afterValue)
+          }
+            */
+            /* VARIANT 2: as VARIANT 1 but leverages map to build the result (not per se my favorite)
+          case f: FunValue => {
+            var news: State = s2
+            var vals: Seq[Value] = args.map { arg: AExpr =>   // also yukkie: map with side effects
+              val (newstate, value) = runExpression(arg, news)
+              news = newstate
+              value
+            }
+
+            val (afterState, afterValue) = runFunction(f.fun, vals, news) // but don't need reverse anymore
+            //reset env, keep changes to symbolic state
+            afterState.env = news.env
+            (afterState, afterValue)
+          }
+            */
+            /* VARIANT 3: refactors VARIANT 1 for a better separation of concerns, but still refrains from using Cats or Scalaz
+          case f: FunValue => {
+            type StateF[A] = State => (State, A)
+            // idiomatic scala definition; `traverse` aligns somewhat with cats.Traverse
+            def traverse[A, B](xs: Seq[A])(f: A => StateF[B]): StateF[Seq[B]] = { s: State =>
+              var news: State = s
+              var vals: Seq[B] = Nil
+              for (x <- xs) {
+                val (newstate, value) = f(x)(s)
+                news = newstate
+                vals = value +: vals
+              }
+              (news, vals.reverse)
+            }
+            // however, arguably, this signature appeals better to intuition
+            def map[A, B](f: A => StateF[B])(xs: Seq[A]): StateF[Seq[B]] = traverse(xs)(f)
+
+
+            def runExp(exp: AExpr): StateF[Value] = runExpression(exp, _)   // { s: State => runExpression(exp, s) }
+            //val (news, vals) = traverse(args)(runExp)(s2)
+            val (news, vals) = map(runExp)(args)(s2)
+
+            val (afterState, afterValue) = runFunction(f.fun, vals, news)  // don't need reverse anymore
+            //reset env, keep changes to symbolic state
+            afterState.env = news.env
+            (afterState, afterValue)
+          }
+            */
           case _ => throw new RuntimeException(s"Call to a non-function at $loc, $funValue found")
         }
     }
