@@ -30,6 +30,7 @@ var out: File = Globals.defaultOut
 
 var run = false
 var concolic = false
+var budget = Int.MaxValue
 
 def check (): Boolean = {
 source != null
@@ -81,6 +82,10 @@ object entry {
         |
         | e.g. -sign wl  will run the sign analysis using the basic worklist solver
         |
+        | When performing concolic testing, these options apply:
+        |
+        | -budget            limits the search budget
+        |
         | Running:
         |
         | -run               run the program as the last step
@@ -123,6 +128,9 @@ object entry {
           options.dfAnalysis += dfa.withName(args(i).drop(1)) -> extDataFlowOptions(i)
         case "-run" =>
           options.run = true
+        case "-budget" =>
+          options.budget = args(i + 1).toInt
+          i += 1
         case "-concolic" =>
           options.concolic = true
         case "-verbose" =>
@@ -228,7 +236,7 @@ object entry {
             new Interpreter(programNode).run()
           }
           if (options.concolic) {
-            new SymbolicInterpreter(programNode).test()
+            new SymbolicInterpreter(programNode).test(options.budget)
           }
           log.info("Success")
       }

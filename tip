@@ -1,9 +1,4 @@
 #!/bin/bash
-set -e
 
 PROJECT_DIR=$(cd "${BASH_SOURCE[0]%/*}" && pwd -P)
-
-cd $PROJECT_DIR
-sbt ';compile;start-script'
-
 $PROJECT_DIR/target/tip $@
